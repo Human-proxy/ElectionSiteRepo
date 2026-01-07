@@ -1,0 +1,207 @@
+@startuml ElectionDomain
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 80
+
+/'
+===============================================================================
+STEMWIJS ELECTION DOMAIN MODEL
+===============================================================================
+
+PURPOSE:
+This UML class diagram represents the election data model for the StemWijs 
+platform. It shows how Dutch election results are structured, from national
+level down to individual municipalities.
+
+SCOPE:
+- Election results storage (parsed from Kiesraad XML data)
+- National and municipal vote aggregation
+- Party and candidate information
+- Constituency and municipality structure
+
+DATA SOURCE:
+All data is parsed from official XML files provided by the Kiesraad (Dutch 
+Electoral Council) and stored in normalized database tables.
+
+LAST UPDATED: November 2025 (Sprint 3)
+===============================================================================
+'/
+
+' ============================================================================
+' ELECTION CORE ENTITIES
+' ============================================================================
+
+class Election {
+  - String id
+  - String name
+  - String date
+  - Map<String, Object> metadata
+  __
+  + getId(): String
+  + getName(): String
+  + getDate(): String
+}
+
+class Party {
+  - Long id
+  - Long partyId
+  - String name
+  - String shortcode
+  - String color
+  - int totalVotes
+  - int seats
+  - boolean elected
+  __
+  + getPartyId(): Long
+  + getName(): String
+  + getTotalVotes(): int
+  + getSeats(): int
+  + isElected(): boolean
+}
+
+class Candidate {
+  - Long pk
+  - String id
+  - String firstName
+  - String lastName
+  - String shortCode
+  - boolean elected
+  - int totalVotes
+  __
+  + getFullName(): String
+  + isElected(): boolean
+  + getTotalVotes(): int
+}
+
+' ============================================================================
+' GEOGRAPHIC STRUCTURE
+' ============================================================================
+
+class Constituency {
+  - String id
+  - String name
+  __
+  + getName(): String
+}
+
+class Municipality {
+  - String id
+  - String name
+  __
+  + getName(): String
+}
+
+' ============================================================================
+' ELECTION RESULTS - NATIONAL LEVEL
+' ============================================================================
+
+class PartyResult {
+  - Long id
+  - int totalVotes
+  - double percentage
+  - int seats
+  - boolean elected
+  __
+  + getTotalVotes(): int
+  + getPercentage(): double
+  + getSeats(): int
+}
+
+' ============================================================================
+' ELECTION RESULTS - MUNICIPAL LEVEL
+' ============================================================================
+
+class MunicipalityResult {
+  - Long id
+  - int totalVotes
+  - double percentage
+  __
+  + getTotalVotes(): int
+  + getPercentage(): double
+}
+
+class MunicipalityCandidate {
+  - Long id
+  - String candidateId
+  - String name
+  - String partyId
+  - int votes
+  __
+  + getCandidateId(): String
+  + getVotes(): int
+}
+
+class MunicipalityParty {
+  - Long id
+  - String partyId
+  - String name
+  - int votes
+  __
+  + getPartyId(): String
+  + getVotes(): int
+}
+
+' ============================================================================
+' RELATIONSHIPS - ELECTION STRUCTURE
+' ============================================================================
+
+Election "1" *-- "0..*" Candidate : contains
+Election "1" *-- "0..*" Party : has
+Election "1" *-- "0..*" Constituency : "divided into"
+
+' Candidates belong to a party
+Candidate "0..*" --> "1" Party : "belongs to"
+
+' Constituencies contain municipalities
+Constituency "1" *-- "0..*" Municipality : "composed of"
+
+' ============================================================================
+' RELATIONSHIPS - NATIONAL RESULTS
+' ============================================================================
+
+Election "1" *-- "0..*" PartyResult : "has results"
+PartyResult "0..*" --> "1" Party : "tracks"
+
+' ============================================================================
+' RELATIONSHIPS - MUNICIPAL RESULTS
+' ============================================================================
+
+Election "1" *-- "0..*" MunicipalityResult : "has results"
+MunicipalityResult "0..*" --> "1" Municipality : "for"
+MunicipalityResult "0..*" --> "1" Party : "of"
+
+' ============================================================================
+' NOTES
+' ============================================================================
+
+note top of PartyResult
+  National-level aggregated results
+  Calculated from all municipalities
+  Used for national seat allocation
+end note
+
+note top of MunicipalityResult
+  Municipality-level detailed results
+  Per party, per municipality
+  Granular voting data
+end note
+
+note bottom of Election
+  Central entity linking all election data
+  One election (e.g., "TK2023") contains:
+  - All parties and candidates
+  - All geographic divisions
+  - All result aggregations
+end note
+
+note right of Constituency
+  Geographic voting regions
+  Each contains multiple municipalities
+  Used for regional analysis
+end note
+
+@enduml

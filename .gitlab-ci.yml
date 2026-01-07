@@ -1,0 +1,18 @@
+variables:
+  DEPLOY_MKDOCS: "true"
+  DEPLOY_HIC: "false"
+
+include:
+  - ".gitlab-ci.mkdocs.yml"
+
+stages:
+  - test
+  - deploy
+
+backend-tests:
+  stage: test
+  image: maven:3.9.9-eclipse-temurin-21
+  script:
+    - mvn -f election-backend/pom.xml test
+  tags:
+    - hva

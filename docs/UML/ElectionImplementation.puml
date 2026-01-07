@@ -1,0 +1,277 @@
+@startuml ElectionImplementation
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+
+/'
+===============================================================================
+ELECTION DOMAIN - IMPLEMENTATION DIAGRAM
+===============================================================================
+
+PURPOSE:
+This UML class diagram shows the actual Java/JPA implementation of the election
+data model. It includes all technical details needed for development.
+
+SCOPE:
+- Election data entities with JPA annotations
+- Database column mappings and constraints
+- Relationship configurations (cascade, fetch strategies)
+- Complete method signatures
+
+PACKAGE:
+nl.hva.dederdekamer.election_backend.XMLParser.model
+
+TECHNOLOGY:
+- Jakarta Persistence (JPA)
+- Hibernate as JPA provider
+- H2 Database (development)
+- Jackson for JSON serialization
+
+LAST UPDATED: December 2025 (Sprint 4)
+===============================================================================
+'/
+
+' ============================================================================
+' ELECTION DATA ENTITIES
+' ============================================================================
+
+class Election <<@Entity>> {
+  - String id «@Id»
+  - String name
+  - String date
+  - List<Candidate> candidates «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<Constituency> constituencies «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<Party> parties «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<PartyResult> partyResults «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<MunicipalityResult> municipalityResults «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - Map<String, Object> metadata «@Transient»
+  __
+  + Election()
+  + Election(String id)
+  + getId(): String
+  + setId(String id): void
+  + getName(): String
+  + setName(String name): void
+  + getDate(): String
+  + setDate(String date): void
+  + getCandidates(): List<Candidate>
+  + addCandidateToList(Candidate): void
+  + findCandidate(String candidateId, Long partyId): Candidate
+  + getParties(): List<Party>
+  + addParty(Party): void
+  + getConstituencies(): List<Constituency>
+  + addConstituency(Constituency): void
+  + getPartyResults(): List<PartyResult>
+  + getMunicipalityResults(): List<MunicipalityResult>
+}
+
+class Party <<@Entity>> {
+  - Long id «@Id @GeneratedValue(IDENTITY)»
+  - Long partyId «@Column(nullable=false)»
+  - String name «@Column(nullable=false)»
+  - String shortcode
+  - String color
+  - Election election «@ManyToOne(FetchType.LAZY) @JoinColumn»
+  - List<Candidate> candidates «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - Integer totalVotes
+  - Integer seats
+  - Boolean elected
+  __
+  + Party()
+  + Party(Long partyId, String name)
+  + Party(Long partyId, String name, String shortcode)
+  + Party(String partyIdStr, String name)
+  + Party(String partyIdStr, String name, boolean elected)
+  + getId(): Long
+  + setId(Long): void
+  + getPartyId(): Long
+  + setPartyId(Long): void
+  + getName(): String
+  + setName(String): void
+  + getShortcode(): String
+  + setShortcode(String): void
+  + getColor(): String
+  + setColor(String): void
+  + getTotalVotes(): Integer
+  + setTotalVotes(Integer): void
+  + getSeats(): Integer
+  + setSeats(Integer): void
+  + isElected(): Boolean
+  + setElected(Boolean): void
+  + getElection(): Election
+  + setElection(Election): void
+  + getCandidates(): List<Candidate>
+  - parseLongSafely(String): Long
+}
+
+class Candidate <<@Entity>> {
+  - Long pk «@Id @GeneratedValue(IDENTITY)»
+  - String id «@Column(name="external_id")»
+  - String shortCode «@Column»
+  - String firstName «@Column»
+  - String lastName «@Column»
+  - Party party «@ManyToOne(FetchType.LAZY) @JoinColumn»
+  - Election election «@ManyToOne(FetchType.LAZY) @JoinColumn»
+  - boolean elected
+  - int totalVotes
+  __
+  + Candidate()
+  + Candidate(String firstName, String lastName)
+  + Candidate(String id, String shortCode, String firstName, String lastName)
+  + getPk(): Long
+  + setPk(Long): void
+  + getId(): String
+  + setId(String): void
+  + getShortCode(): String
+  + setShortCode(String): void
+  + getFirstName(): String
+  + setFirstName(String): void
+  + getLastName(): String
+  + setLastName(String): void
+  + getParty(): Party
+  + setParty(Party): void
+  + getPartyId(): Long
+  + setPartyId(String): void
+  + isElected(): boolean
+  + setElected(boolean): void
+  + getTotalVotes(): int
+  + setTotalVotes(int): void
+  + getElection(): Election
+  + setElection(Election): void
+  + getFullName(): String
+}
+
+class Constituency <<@Entity>> {
+  - String id «@Id»
+  - String name «@Column»
+  - Election election «@ManyToOne @JoinColumn»
+  - List<Municipality> municipalities «@OneToMany(CASCADE.ALL, FetchType.LAZY)»
+  - Map<String, Party> parties «@Transient»
+  __
+  + Constituency()
+  + Constituency(String id, String name)
+  + getId(): String
+  + setId(String): void
+  + getName(): String
+  + setName(String): void
+  + getElection(): Election
+  + setElection(Election): void
+  + getMunicipalities(): List<Municipality>
+  + setMunicipalities(List<Municipality>): void
+  + getParties(): Map<String, Party>
+}
+
+class Municipality <<@Entity>> {
+  - String id «@Id»
+  - String name «@Column»
+  - Constituency constituency «@ManyToOne @JoinColumn»
+  __
+  + Municipality()
+  + Municipality(String id, String name)
+  + getId(): String
+  + setId(String): void
+  + getName(): String
+  + setName(String): void
+  + getConstituency(): Constituency
+  + setConstituency(Constituency): void
+  + getPartyInMunicipality(Election, Long): Party
+  + toString(): String
+  + equals(Object): boolean
+  + hashCode(): int
+}
+
+' ============================================================================
+' RELATIONSHIPS
+' ============================================================================
+
+Election "1" *-- "0..*" Candidate : "contains >\n@OneToMany(CASCADE.ALL)"
+Election "1" *-- "0..*" Party : "has >\n@OneToMany(CASCADE.ALL)"
+Election "1" *-- "0..*" Constituency : "divided into >\n@OneToMany(CASCADE.ALL)"
+
+Candidate "0..*" --> "1" Party : "< belongs to\n@ManyToOne(LAZY)"
+Candidate "0..*" --> "1" Election : "< part of\n@ManyToOne(LAZY)"
+
+Party "0..*" --> "1" Election : "< part of\n@ManyToOne(LAZY)"
+Party "1" o-- "0..*" Candidate : "has candidates >"
+
+Constituency "1" *-- "0..*" Municipality : "composed of >\n@OneToMany(CASCADE.ALL)"
+Constituency "0..*" --> "1" Election : "< part of\n@ManyToOne"
+Municipality "0..*" --> "1" Constituency : "< belongs to\n@ManyToOne"
+
+' ============================================================================
+' TECHNICAL NOTES
+' ============================================================================
+
+note right of Election
+  **Election Data Management**
+  - Root entity for all election data
+  - Parsed from Kiesraad XML files
+  - Cascade deletes to all children
+  - Contains transient cache fields
+end note
+
+note right of Party
+  **Party & Seat Calculation**
+  - Unique per election (party_id + election_id)
+  - National vote aggregation
+end note
+
+note bottom of Candidate
+  **Candidate Information**
+  - External ID from XML source
+  - Vote totals across municipalities
+  - Top candidates marked as elected
+  - Lazy loading for performance
+end note
+
+note left of Constituency
+  **Geographic Hierarchy**
+  - Groups municipalities
+  - Aggregates local results
+  - Contains transient party map
+  - Used for regional analysis
+end note
+
+' ============================================================================
+' DATA SOURCE & PROCESSING
+' ============================================================================
+
+note as DataSource
+  **Kiesraad XML Processing**
+  
+  **Data Flow:**
+  1. XML files downloaded from Kiesraad
+  2. Parsed into Java objects
+  3. Entities created and persisted
+  4. Relationships established
+  5. Votes aggregated by level
+  
+  **Hierarchy:**
+  National → Constituency → Municipality
+  
+  **Vote Aggregation:**
+  Municipality votes → Constituency totals → National results
+end note
+
+note as CalculationNotes
+  **Seat Allocation**
+  
+  **D'Hondt Method:**
+  1. Divide party votes by 1, 2, 3, etc.
+  2. Allocate 150 seats to highest quotients
+  3. Mark parties with seats as "elected"
+  
+  **Candidate Selection:**
+  - Candidates sorted by preference votes
+  - Top N candidates per party get seats
+  - Marked with elected = true
+end note
+
+DataSource -[hidden]down- CalculationNotes
+Election -[hidden]left- DataSource
+
+@enduml

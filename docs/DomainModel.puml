@@ -1,0 +1,238 @@
+@startuml DomainModel
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 80
+
+/'
+===============================================================================
+STEMWIJS DOMAIN MODEL - CLASS DIAGRAM
+===============================================================================
+
+PURPOSE:
+This UML class diagram represents the complete data model for the StemWijs 
+election platform. It shows how election data, user accounts, and community 
+features are structured and related within the system.
+
+MAIN DOMAINS:
+1. ELECTION DATA - Core entities for storing Dutch election results
+2. USER & AUTHENTICATION - User accounts with role-based access control
+3. FORUM SYSTEM - Community discussion platform with posts and comments
+
+DESIGN DECISIONS:
+- Normalized database design to reduce data redundancy
+- Removed ElectedCandidate entity (replaced with boolean flag in Candidate)
+- Removed partyName from Candidate (uses ManyToOne relation to Party instead)
+- Separated concerns between election data and user-generated content
+- Added TagEntity for post categorization (many-to-many relationship)
+- Added PasswordResetToken for secure password recovery flow
+
+DATABASE SCHEMA:
+This diagram directly maps to JPA entities in the backend codebase. Each class
+represents a database table, and relationships define foreign key constraints.
+
+LAST UPDATED: December 2025 (Sprint 4 - Updated with Tags and Password Reset)
+===============================================================================
+'/
+
+' ============================================================================
+' ELECTION DATA DOMAIN
+' ============================================================================
+' These entities store election results parsed from official XML data files
+' provided by the Kiesraad (Dutch Electoral Council)
+
+class Election {
+  - String id
+  - String name
+  - String date
+  - Map<String, Object> metadata
+  __
+  + getId(): String
+  + getName(): String
+  + getDate(): String
+}
+
+class Party {
+  - Long pk
+  - String id
+  - String name
+  - int votes
+  - int seats
+  - boolean elected
+  __
+  + getVotes(): int
+  + getSeats(): int
+  + isElected(): boolean
+}
+
+class Candidate {
+  - Long pk
+  - String id
+  - String firstName
+  - String lastName
+  - String shortCode
+  - String partyId
+  - boolean elected
+  - int totalVotes
+  __
+  + getFullName(): String
+  + isElected(): boolean
+  + getTotalVotes(): int
+}
+
+class Constituency {
+  - Long pk
+  - String id
+  - String name
+  - int totalVotesCast
+  - int topPartyVotes
+  - String topPartyName
+  __
+  + getTotalVotesCast(): int
+  + getTopParty(): String
+}
+
+class Municipality {
+  - String id
+  - String name
+  - String pollingBureau
+  __
+  + getName(): String
+  + getPollingBureau(): String
+}
+
+' ============================================================================
+' USER & AUTHENTICATION DOMAIN
+' ============================================================================
+' These entities manage user accounts, authentication, and authorization
+
+class UserEntity {
+  - Long id
+  - String username
+  - String email
+  - String passwordHash
+  - String profileImageUrl
+  - LocalDateTime createdAt
+  - boolean enabled
+  __
+  + getUsername(): String
+  + getEmail(): String
+  + isEnabled(): boolean
+}
+
+class RoleEntity {
+  - Long id
+  - RoleName name
+  __
+  + getName(): RoleName
+}
+
+note right of RoleEntity
+  Enum RoleName: USER, ADMIN
+  Used for role-based access control
+end note
+
+' ============================================================================
+' FORUM & COMMUNITY DOMAIN
+' ============================================================================
+' These entities enable user-generated discussions and comments
+
+class Post {
+  - Integer id
+  - String title
+  - String content
+  - Timestamp created
+  __
+  + getTitle(): String
+  + getContent(): String
+  + getCreated(): Timestamp
+}
+
+class Comment {
+  - Integer id
+  - String content
+  - Instant created
+  __
+  + getContent(): String
+  + getCreated(): Instant
+}
+
+class TagEntity {
+  - Integer id
+  - String tagName
+  __
+  + getTagName(): String
+  + setTagName(String): void
+}
+
+class PasswordResetToken {
+  - Long id
+  - String token
+  - LocalDateTime expiryDate
+  - boolean used
+  __
+  + getToken(): String
+  + isExpired(): boolean
+}
+
+' ============================================================================
+' RELATIONSHIPS - ELECTION DATA
+' ============================================================================
+' One election contains many candidates, parties, constituencies, and municipalities
+
+Election "1" *-- "1..*" Candidate : contains
+Election "1" *-- "1..*" Party : has
+Election "1" *-- "1..*" Constituency : "divided into"
+Election "1" *-- "1..*" Municipality : contains
+
+' Candidates belong to a party (normalized - no duplicate party names)
+Candidate "1..*" --> "1" Party : "belongs to"
+
+' Constituencies aggregate municipalities
+Constituency "1" o-- "1..*" Municipality : "composed of"
+
+' Constituencies track top party performance
+Constituency "0..1" --> "0..*" Party : "tracks performance"
+
+' ============================================================================
+' RELATIONSHIPS - USER & FORUM
+' ============================================================================
+' Users can create posts, posts can have comments
+
+UserEntity "1" *-- "1..*" Post : creates
+Post "1" *-- "0..*" Comment : "has comments"
+
+' Users have roles (many-to-many through join table)
+UserEntity "1" --> "1..*" RoleEntity : "has roles"
+
+' Comments are written by users
+Comment "1" --> "1" UserEntity : "written by"
+
+' Posts can have tags (many-to-many)
+Post "0..*" --> "0..*" TagEntity : "tagged with"
+
+' Password reset tokens belong to users
+PasswordResetToken "0..*" --> "1" UserEntity : "for user"
+
+note bottom of UserEntity
+  Authentication: JWT-based
+  Password: BCrypt hashed
+  Email verification: 4-digit code
+  Soft delete: deletedAt timestamp
+end note
+
+note right of TagEntity
+  Tags for categorizing forum posts
+  Many-to-many with Post via join table
+end note
+
+note right of PasswordResetToken
+  Time-limited tokens for password reset
+  Expires after set duration
+  Single-use only (used flag)
+end note
+
+@enduml

@@ -1,0 +1,299 @@
+@startuml UserImplementation
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 70
+skinparam padding 2
+
+/'
+===============================================================================
+USER & FORUM DOMAIN - IMPLEMENTATION DIAGRAM
+===============================================================================
+
+PURPOSE:
+This UML class diagram shows the actual Java/JPA implementation of the user
+management, authentication, and forum system.
+
+SCOPE:
+- User entities with authentication
+- Role-based access control (RBAC)
+- Forum posts and comments
+- Tag system for categorization
+- Password reset functionality
+
+PACKAGE:
+nl.hva.dederdekamer.election_backend.entities
+
+TECHNOLOGY:
+- Jakarta Persistence (JPA)
+- Spring Security with JWT
+- BCrypt password hashing
+- Bean Validation (jakarta.validation)
+- Jackson for JSON serialization
+
+LAST UPDATED: December 2025 (Sprint 4)
+===============================================================================
+'/
+
+' ============================================================================
+' USER & AUTHENTICATION ENTITIES
+' ============================================================================
+
+class UserEntity <<@Entity>> {
+  - Long id «@Id @GeneratedValue(IDENTITY)»
+  - String username «@Column(unique, nullable=false, length=64)»
+  - String email «@Column(unique, nullable=false, length=120)»
+  - String passwordHash «@Column(nullable=false, length=100)»
+  - String profileImageUrl «@Column(TEXT)»
+  - LocalDateTime createdAt «@Column(nullable=false, updatable=false)»
+  - Set<String> visitedPages «@ElementCollection»
+  - boolean enabled «@Column(nullable=false)»
+  - boolean emailVerified «@Column(nullable=false)»
+  - LocalDateTime deletedAt
+  - Set<RoleEntity> roles «@ManyToMany(FetchType.EAGER) @JoinTable»
+  - List<Post> posts «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<Comment> comments «@OneToMany(CASCADE.ALL, orphanRemoval=true)»
+  - List<PasswordResetToken> passwordResetTokens «@OneToMany(CASCADE.ALL)»
+  __
+  # UserEntity()
+  + UserEntity(String username, String email, String passwordHash, boolean enabled, Set<RoleEntity> roles)
+  + getId(): Long
+  + getUsername(): String
+  + setUsername(String): void
+  + getEmail(): String
+  + setEmail(String): void
+  + getPasswordHash(): String
+  + setPasswordHash(String): void
+  + getProfileImageUrl(): String
+  + setProfileImageUrl(String): void
+  + getCreatedAt(): LocalDateTime
+  + isEnabled(): boolean
+  + setEnabled(boolean): void
+  + isEmailVerified(): boolean
+  + setEmailVerified(boolean): void
+  + getDeletedAt(): LocalDateTime
+  + setDeletedAt(LocalDateTime): void
+  + getRoles(): Set<RoleEntity>
+  + setRoles(Set<RoleEntity>): void
+  + getPosts(): List<Post>
+  + getComments(): List<Comment>
+  + getPasswordResetTokens(): List<PasswordResetToken>
+  + getVisitedPages(): Set<String>
+  + setVisitedPages(Set<String>): void
+}
+
+class RoleEntity <<@Entity>> {
+  - Long id «@Id @GeneratedValue(IDENTITY)»
+  - RoleName name «@Enumerated(STRING) @Column(unique, nullable=false, length=32)»
+  __
+  # RoleEntity()
+  + RoleEntity(RoleName name)
+  + getId(): Long
+  + getName(): RoleName
+}
+
+enum RoleName {
+  USER
+  ADMIN
+}
+
+class PasswordResetToken <<@Entity>> {
+  - Long id «@Id @GeneratedValue(IDENTITY)»
+  - String token «@Column(unique, nullable=false)»
+  - UserEntity user «@ManyToOne(FetchType.EAGER) @JoinColumn»
+  - LocalDateTime expiryDate «@Column(nullable=false)»
+  - boolean used «@Column(nullable=false)»
+  __
+  + PasswordResetToken()
+  + PasswordResetToken(String token, UserEntity user, LocalDateTime expiryDate)
+  + getId(): Long
+  + setId(Long): void
+  + getToken(): String
+  + setToken(String): void
+  + getUser(): UserEntity
+  + setUser(UserEntity): void
+  + getExpiryDate(): LocalDateTime
+  + setExpiryDate(LocalDateTime): void
+  + isUsed(): boolean
+  + setUsed(boolean): void
+  + isExpired(): boolean
+}
+
+' ============================================================================
+' FORUM ENTITIES
+' ============================================================================
+
+class Post <<@Entity>> {
+  - Integer id «@Id @GeneratedValue(IDENTITY)»
+  - String title
+  - String content
+  - Timestamp created
+  - UserEntity author «@ManyToOne(FetchType.LAZY, optional=false) @JoinColumn(name="author_id", nullable=false)»
+  - List<Comment> comments «@OneToMany(mappedBy="post", CASCADE.ALL, orphanRemoval=true)»
+  - List<TagEntity> tags «@ManyToMany(FetchType.EAGER) @JoinTable»
+  __
+  + Post()
+  + Post(String title, String content, UserEntity author)
+  + getId(): Integer
+  + setId(Integer): void
+  + getTitle(): String
+  + setTitle(String): void
+  + getContent(): String
+  + setContent(String): void
+'  + getCreated(): Timestamp
+  + getAuthor(): UserEntity
+  + setAuthor(UserEntity): void
+'  + getComments(): List<Comment>
+  + getTags(): List<TagEntity>
+  + setTags(List<TagEntity>): void
+}
+
+class Comment <<@Entity @Table(name="comment")>> {
+  - Integer id «@Id @GeneratedValue(IDENTITY)»
+  - Post post «@ManyToOne(FetchType.LAZY, optional=false) @JoinColumn(name="post_id", nullable=false) @NotNull»
+  - String content «@NotBlank @Size(max=10000) @Column(nullable=false, length=10000)»
+  - Instant created «@Column(nullable=false, updatable=false)»
+  - UserEntity author «@ManyToOne(FetchType.LAZY, optional=false, CASCADE.ALL) @JoinColumn(name="author_id", nullable=false)»
+  __
+  + Comment()
+  + Comment(Post post, String content, UserEntity author)
+  # onCreate(): void «@PrePersist»
+  + getId(): Integer
+  + getPost(): Post
+  + setPost(Post): void
+  + getContent(): String
+  + setContent(String): void
+  + getCreated(): Instant
+  + getAuthor(): UserEntity
+  + setAuthor(UserEntity): void
+  + getCreatedLocal(): String
+}
+
+class TagEntity <<@Entity>> {
+  - Integer id «@Id @GeneratedValue(IDENTITY)»
+  - String tagName «@NotBlank @Size(max=10000) @Column(nullable=false, length=10000)»
+  - Set<Post> posts «@ManyToMany(mappedBy="tags")»
+  __
+  + getId(): Integer
+  + setId(Integer): void
+  + getTagName(): String
+  + setTagName(String): void
+  + getPosts(): Set<Post>
+  + setPosts(Set<Post>): void
+}
+
+' ============================================================================
+' RELATIONSHIPS
+' ============================================================================
+
+UserEntity "1" *-- "0..*" Post : "creates >\n@OneToMany"
+UserEntity "1" *-- "0..*" Comment : "writes >\n@OneToMany"
+UserEntity "1" *-- "0..*" PasswordResetToken : "has >\n@OneToMany"
+
+UserEntity "0..*" o-- "1..*" RoleEntity : "< has roles\n@ManyToMany(EAGER)\nuser_roles"
+RoleEntity "1" --> "1" RoleName : "< uses\n@Enumerated"
+
+Post "1" *-- "0..*" Comment : "has comments >"
+Post "0..*" o-- "0..*" TagEntity : "< tagged with\n@ManyToMany(EAGER)\npost_tags"
+
+Comment "0..*" --> "1" Post : "< belongs to"
+Comment "0..*" --> "1" UserEntity : "< written by"
+
+Post "0..*" --> "1" UserEntity : "< authored by\n@ManyToOne(LAZY)"
+
+PasswordResetToken "0..*" --> "1" UserEntity : "< for user\n@ManyToOne(EAGER)"
+
+' ============================================================================
+' TECHNICAL NOTES
+' ============================================================================
+
+note right of UserEntity
+  **Authentication & Authorization**
+  - BCrypt password hashing
+  - JWT token-based auth
+  - Email verification required
+  - Soft delete via deletedAt
+  - Page visit tracking
+end note
+
+note right of RoleEntity
+  **Role-Based Access Control**
+  USER: Default role, forum access
+  ADMIN: Full system access
+  
+  Eagerly loaded for performance
+end note
+
+note bottom of Post
+  **Forum Post Management**
+  - Author is mandatory
+  - Tags via join table (post_tags)
+  - Comments cascade deleted
+  - Timestamp auto-generated
+end note
+
+note bottom of Comment
+  **Validation & Lifecycle**
+  - Max 10,000 characters
+  - Timestamp via @PrePersist
+  - Timezone: Europe/Amsterdam
+  - Immutable after creation
+end note
+
+note left of PasswordResetToken
+  **Security Flow**
+  1. User requests reset
+  2. Token generated (unique)
+  3. Email sent with link
+  4. Token expires after time
+  5. Marked as used after reset
+end note
+
+' ============================================================================
+' SECURITY & VALIDATION NOTES
+' ============================================================================
+
+note as ImplementationDetails
+  **JPA Implementation Details**
+  
+  **Join Tables (Many-to-Many):**
+  • user_roles: Links users to roles
+  • post_tags: Categorizes posts with tags
+  
+  **Element Collection:**
+  • user_visited_pages: Tracks user navigation
+  
+  **Cascade Strategies:**
+  • CASCADE.ALL: Changes propagate to children
+  • orphanRemoval: Deletes orphaned entities
+  
+  **Fetch Types:**
+  • EAGER: Load immediately (roles, tags)
+  • LAZY: Load on demand (posts, comments)
+end note
+
+note as SecurityFlow
+  **Authentication & Security**
+  
+  **Registration Flow:**
+  1. User submits credentials
+  2. Password hashed with BCrypt
+  3. Verification email sent
+  4. User confirms email
+  5. Account activated
+  
+  **Login Flow:**
+  1. Credentials validated
+  2. JWT token generated
+  3. Token contains: id, username, roles
+  4. Token sent to client
+  5. Client includes token in requests
+end note
+
+ImplementationDetails -[hidden]down- SecurityFlow
+UserEntity -[hidden]right- ImplementationDetails
+
+@enduml

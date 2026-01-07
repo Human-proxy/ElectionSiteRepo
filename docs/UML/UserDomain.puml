@@ -1,0 +1,214 @@
+@startuml UserDomain
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 80
+skinparam ranksep 80
+
+/'
+===============================================================================
+STEMWIJS USER & COMMUNITY DOMAIN MODEL
+===============================================================================
+
+PURPOSE:
+This UML class diagram represents the user management and community features
+of the StemWijs platform. It includes authentication, authorization, forum
+discussions, and user-generated content.
+
+SCOPE:
+- User accounts and authentication
+- Role-based access control (RBAC)
+- Forum posts and comments
+- Tag system for content categorization
+- Password reset functionality
+
+SECURITY:
+- Custom JWT-based authentication (not Spring Security)
+- BCrypt password hashing
+- Email verification with 4-digit codes
+- Time-limited password reset tokens
+
+LAST UPDATED: November 2025 (Sprint 3)
+===============================================================================
+'/
+
+' ============================================================================
+' USER & AUTHENTICATION
+' ============================================================================
+
+class UserEntity {
+  - Long id
+  - String username
+  - String email
+  - String passwordHash
+  - String profileImageUrl
+  - LocalDateTime createdAt
+  - boolean enabled
+  - boolean emailVerified
+  - Set<String> visitedPages
+  __
+  + getUsername(): String
+  + getEmail(): String
+  + isEnabled(): boolean
+  + isEmailVerified(): boolean
+  + getVisitedPages(): Set<String>
+}
+
+class RoleEntity {
+  - Long id
+  - RoleName name
+  __
+  + getName(): RoleName
+}
+
+class PasswordResetToken {
+  - Long id
+  - String token
+  - LocalDateTime expiryDate
+  - boolean used
+  __
+  + getToken(): String
+  + isExpired(): boolean
+  + isUsed(): boolean
+}
+
+' ============================================================================
+' FORUM & COMMUNITY
+' ============================================================================
+
+class Post {
+  - Integer id
+  - String title
+  - String content
+  - Timestamp created
+  __
+  + getTitle(): String
+  + getContent(): String
+  + getCreated(): Timestamp
+}
+
+class Comment {
+  - Integer id
+  - String content
+  - Instant created
+  __
+  + getContent(): String
+  + getCreated(): Instant
+}
+
+class TagEntity {
+  - Integer id
+  - String tagName
+  __
+  + getTagName(): String
+}
+
+' ============================================================================
+' RELATIONSHIPS - USER MANAGEMENT
+' ============================================================================
+
+' Users have roles (many-to-many through user_roles join table)
+UserEntity "1..*" --> "1..*" RoleEntity : "has roles"
+
+' Password reset tokens belong to users (one-to-many)
+UserEntity "1" --> "0..*" PasswordResetToken : "has tokens"
+
+' ============================================================================
+' RELATIONSHIPS - FORUM SYSTEM
+' ============================================================================
+
+' Users create posts (one-to-many, author relationship)
+UserEntity "1" *-- "0..*" Post : creates
+
+' Posts have comments (one-to-many, composition)
+Post "1" *-- "0..*" Comment : "has comments"
+
+' Comments are written by users (many-to-one)
+Comment "0..*" --> "1" UserEntity : "written by"
+
+' Posts can have tags (many-to-many through post_tags join table)
+Post "0..*" <--> "0..*" TagEntity : "tagged with"
+
+' ============================================================================
+' NOTES
+' ============================================================================
+
+note bottom of UserEntity
+  <b>Authentication</b>
+  - Custom JWT implementation (handcrafted)
+  - No Spring Security framework
+  
+  <b>Password Storage</b>
+  - BCrypt hashed (spring-security-crypto only)
+  - Salt automatically generated
+  
+  <b>Email Verification</b>
+  - 4-digit verification code
+  - 15-minute expiration window
+  - ZonedDateTime for timezone handling
+  
+  <b>Page Tracking</b>
+  - ElementCollection of visited page paths
+  - Used for analytics and recommendations
+end note
+
+note top of RoleEntity
+  <b>Role Names</b>
+  Enum: USER, ADMIN
+  
+  <b>Access Control</b>
+  - USER: Basic platform access
+  - ADMIN: Full system management
+  
+  Eagerly fetched for auth flows
+end note
+
+note right of PasswordResetToken
+  <b>Password Reset Flow</b>
+  1. User requests reset
+  2. Token generated with 1-hour expiry
+  3. Email sent with reset link
+  4. Token validated and marked as used
+  5. Password updated
+  
+  <b>Security</b>
+  - Single-use only (used flag)
+  - Time-limited expiration
+  - Unique token per request
+end note
+
+note left of Post
+  <b>Forum Features</b>
+  - User-generated discussions
+  - Markdown content support
+  - Tag-based categorization
+  - Nested comments
+  
+  <b>Timestamps</b>
+  - Created: Europe/Amsterdam timezone
+  - Stored as java.sql.Timestamp
+end note
+
+note bottom of TagEntity
+  <b>Tag System</b>
+  - Categorize posts by topics
+  - Max length: 10,000 chars
+  - Many-to-many with posts
+  - Shared across all posts
+end note
+
+note right of Comment
+  <b>Comment System</b>
+  - Nested under posts
+  - Author tracking
+  - Max length: 10,000 chars
+  
+  <b>Timestamps</b>
+  - Stored as java.time.Instant
+  - Auto-generated on creation (@PrePersist)
+  - Immutable (updatable = false)
+end note
+
+@enduml
