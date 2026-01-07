@@ -1,3 +1,16 @@
+## My contributions 
+Within this group project, I actively worked on multiple user stories and tasks, including:
+
+- Development of a community forum (CRUD functionality)
+  - Creating and viewing posts
+  - Replying to forum posts
+  - Navigating between different pages
+  - Anonomizing posts of deletedusers
+- Adding tags to posts to improve content organization and filtering
+- Implementing filters on the comparison page
+- Setting up, working with and maintaining a  AWS database to store data
+
+
 # StemWijs - Dutch Election Platform
 
 A modern web application that helps Dutch citizens understand election results, learn about the political system, and engage in political discussions. Built for Gen Z voters (18-25) with a focus on accessibility and user experience.
